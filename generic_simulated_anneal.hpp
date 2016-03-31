@@ -1,5 +1,5 @@
 /* This file copyright (c) 2016 Sean McBane, under the terms of the MIT
-   License:
+ License:
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -70,18 +70,19 @@ struct GenSimAnnealParams {
 /* Default values for the simulation parameters for convenience; some or
  * all of these may not be appropriate for a given problem. Use with caution!
  */
-const struct GenSimAnnealParams DEFAULT_SIM_ANNEALING_PARAMS =
-{ 100, 500, 0.9, 0.0001, false };
+const struct GenSimAnnealParams DEFAULT_SIM_ANNEALING_PARAMS = { 100, 500, 0.9,
+    0.0001, false };
 
 /* The main routine. Templated on a 'solution' class (must be provided by the
- * user) and a typename 'cost_t' which is the variable type returned by a
+ * user) and a class 'cost_t' which is the variable type returned by a
  * 'solution''s cost() method. This is the value that the algorithm attempts
  * to minimize.
  *
- * The third template parameter is a function which should accept
- * two arguments of type cost_t, with the second greater than the first, and
- * a double, returning a probability that the second cost is selected over
- * the first. The implementation of this function is left to the user.
+ * The third template parameter is a class which can be either a function 
+ * pointer, a lambda expression or a functor. This object must take two objects
+ * of type cost_t (with the second one being greater) and a double value of 
+ * temperature and return a value from 0 to 1, which gives the probability that
+ * a solution with the second cost is chosen over the first.
  *
  * It is important to note that this is a different approach than many other 
  * implementations, which use a fixed probability function and let the 
@@ -96,18 +97,17 @@ const struct GenSimAnnealParams DEFAULT_SIM_ANNEALING_PARAMS =
  * There are a couple of practical concerns for the user to consider; first,
  * the cost function needs to be relatively cheap to evaluate for large
  * problems as it will be evaluated millions of times. Second, and less
- * obviously, the routine makes a copy of the current solution at every
- * iteration when it perturbs it. This means that if your 'solution' class
- * has any data that gets deep copied during assignment (most likely a
- * std::vector) there will be a large overhead. Use pointers to any data
+ * obviously, the routine must make a copy of a solution object at every
+ * iteration (eithe updating it or reverting the perturbed copy to the 
+ * original). This means that if your 'solution' class
+ * has any data that gets deep copied during assignment (such as a std::vector) 
+ * there will be a large overhead. Use pointers to any data
  * in the object that does not need to change from iteration to iteration
  * to avoid this.
  */
-template<class solution, typename cost_t,
-         double (*acceptance_f)(cost_t, cost_t, double)>
-
-GenSimAnnealResults<solution, cost_t>
-genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
+template<class solution, class cost_t, class acceptance_t>
+GenSimAnnealResults<solution, cost_t> genericSimulatedAnneal(const solution& s0,
+    const GenSimAnnealParams& params, acceptance_t acceptance_f) {
 
   // Initialization.
   size_t max_temps = params.max_temps;
@@ -121,6 +121,7 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
 
   // Make a copy of the solution that was passed in:
   solution s = s0;
+  solution s1 = s;
 
   // Keep track of current best solution;
   solution best = s0;
@@ -133,8 +134,7 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
   for (size_t outer_iter = 0; outer_iter < max_temps; ++outer_iter) {
     // Inner iterations at each temperature;
     for (size_t inner_iter = 0; inner_iter < iters_per_temp; ++inner_iter) {
-      // Perturb the solution:
-      solution s1 = s;
+      // Perturb the solution;
       s1.perturb();
 
       // Whether or not we keep the new solution;
@@ -142,7 +142,7 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
 
       // Compute cost of new solution.
       cost_t cost_new = s1.cost();
-      fevals ++;
+      fevals++;
 
       // If new cost is less than old, automatically keep this solution.
       // Also update the stored best solution.
@@ -182,8 +182,7 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
         if (verbose)
           std::cout << "Updating solution at outer iteration " << outer_iter
               << ", inner iteration " << inner_iter << std::endl
-              << "  New cost: " << cost_new << "  Old cost: " << cost_old
-              << std::endl;
+              << "  New cost: " << cost_new << std::endl;
 
         // Met the cost reduction criterion; break.
         if ((double(cost_new)) / cost_init < tol) {
@@ -192,10 +191,16 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
                 << "outer iteration " << outer_iter << ", inner iteration "
                 << inner_iter << ".\n";
 
-          GenSimAnnealResults<solution, cost_t> res =
-            { s, s.cost(), fevals, outer_iter };
+          GenSimAnnealResults<solution, cost_t> res = { s, s.cost(), fevals,
+              outer_iter };
           return res;
         }
+      }
+
+      // If it wasn't accepted, we have to copy s back into s1. There's no way
+      // around one copy every iteration.
+      else {
+        s1 = s;
       }
     }
     temp = temp * alpha;
@@ -208,7 +213,8 @@ genericSimulatedAnneal(const solution& s0, const GenSimAnnealParams& params) {
 
   // When returning, check to see if the stored best solution is better than
   // the current one and if it is, return it instead.
-  GenSimAnnealResults<solution, cost_t> res = { s.cost() < best.cost() ? s : best,
+  GenSimAnnealResults<solution, cost_t> res = {
+      s.cost() < best.cost() ? s : best,
       s.cost() < best.cost() ? s.cost() : best.cost(), fevals, max_temps };
   return res;
 }
