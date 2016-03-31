@@ -26,7 +26,7 @@
 class Tour {
 public:
   size_t numcities;
-  std::shared_ptr<std::vector<long> > xcoords, ycoords;
+  std::shared_ptr<std::vector<long>> xcoords, ycoords;
   std::vector<size_t> visited;
 
   Tour(std::vector<long> xs, std::vector<long> ys);
@@ -39,10 +39,8 @@ Tour::Tour(std::vector<long> xs, std::vector<long> ys) {
   assert(xs.size() == ys.size());
   numcities = xs.size();
 
-  xcoords = std::make_shared < std::vector<long>
-      > (std::vector<long>(numcities));
-  ycoords = std::make_shared < std::vector<long>
-      > (std::vector<long>(numcities));
+  xcoords = std::make_shared <std::vector<long>> (std::vector<long>(numcities));
+  ycoords = std::make_shared <std::vector<long>> (std::vector<long>(numcities));
 
   visited = std::vector<size_t>(numcities + 1);
   for (size_t i = 0; i < numcities; ++i) {
@@ -57,8 +55,8 @@ Tour::Tour(std::vector<long> xs, std::vector<long> ys) {
 // Pythagorean distance.
 unsigned long Tour::cost() const {
   unsigned long dist = 0;
-  std::vector<long>& x = *xcoords;
-  std::vector<long>& y = *ycoords;
+  const std::vector<long>& x = *xcoords;
+  const std::vector<long>& y = *ycoords;
   for (size_t i = 0; i < numcities; ++i) {
     long dx = x[visited[i + 1]] - x[visited[i]];
     long dy = y[visited[i + 1]] - y[visited[i]];
@@ -72,7 +70,7 @@ unsigned long Tour::cost() const {
 // function for an example case.
 void Tour::perturb() {
   size_t city1 = 1
-      + (unsigned long) ceil((double(rand())) / RAND_MAX * (numcities - 3));
+      + (unsigned long) ceil((double(rand())) / RAND_MAX * (numcities - 2));
   size_t city2 = city1;
   while (city2 == city1)
     city2 = 1
@@ -83,18 +81,10 @@ void Tour::perturb() {
   visited[city2] = temp;
 }
 
-// p = exp((c1-c2)/T) is a common formulation; I introduced a constant factor
-// to scale T since it is between 0 and 1 in the algorithm.
-double acceptanceProbability(unsigned long c1, unsigned long c2, double T) {
-  double a = 600.0;
-  double cost1 = double(c1);
-  double cost2 = double(c2);
-  double p = exp((cost1 - cost2) / a / T);
-  return p;
-}
-
-// And here is the demonstration of how the algorithm is then used - note
-// that you should call srand at the beginning of your code.
+// And here is the demonstration of how the algorithm is then used - remember
+// to call srand at the beginning of your code; even if your perturbation 
+// function does something else the annealing routine uses rand() to decide
+// whether or not to accept an increase in cost.
 int main() {
   srand(time(NULL));
 
@@ -117,8 +107,19 @@ int main() {
   std::cout << "Enter alpha: ";
   std::cin >> params.alpha;
 
-  GenSimAnnealResults<Tour, unsigned long> results = genericSimulatedAnneal<
-      Tour, unsigned long, acceptanceProbability>(mytour, params);
+  // This lambda is our acceptance probability function. Note that this is the 
+  // same as the 'canonical' probability function often found in simulated
+  // annealing implementations except for the addition of a scaling factor for
+  // temperature (since T is always 1.0 or less).
+  auto a = [] (unsigned long c1, unsigned long c2, double T) {
+     return exp((static_cast<double>(c1)-static_cast<double>(c2))/T/600.0);
+  };
+
+  // This is how the routine can be called if a lambda expression is used for
+  // the acceptance function; it's very similar for the case of a functor or a 
+  // normal function declaration.
+  GenSimAnnealResults<Tour, unsigned long> results =
+    genericSimulatedAnneal<Tour, unsigned long, decltype(a)>(mytour, params, a);
 
   std::cout << "Tour length: " << results.finalcost << std::endl;
   std::cout << "Function evaluations: " << results.function_evals << std::endl;
