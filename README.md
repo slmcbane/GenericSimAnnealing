@@ -32,8 +32,12 @@ defines the following:
     
 + A set of default GenSimAnnealParams, and
 + The main simulated annealing routine; genericSimulatedAnneal. The routine is  
-  templated on a solution class, a cost function return type, and a user defined
-  function returning the acceptance probability. More on that under 'Usage'.
+  templated on a solution class, a cost function return type, and a class that 
+  must define the function call operator for two objects of the cost function
+  return type (with the second greater than the first) and a double value of
+  temperature. When called, this function/functor/lambda should return a
+  probability (0-1) that the solution with the greater cost is chosen over the
+  first solution.
       
   
 ## Usage
@@ -59,11 +63,11 @@ to the data in your class instead. See the traveling salesman example code for
 this in practice. Secondly, it is important that the cost function be relatively
 inexpensive - but that should be common sense.
 
-You must also provide the third template argument, which is a function to 
-compute the acceptance probability from two costs and the current temperature.
-The function should expect the second cost to be greater than the first and 
-return the probability that a solution with the second cost is chosen over the 
-first. An important note first, however: *the temperature is always between 0 and 1*.
+You must also implement the third template argument, which can be a class, a 
+lambda, or an ordinary function - as long as it can be called as a function 
+`f(cost_t, cost_t, double)`. This object must return a value between 0 and 1,
+giving the acceptance probability for these solutions at this temperature.
+An important note first, however: *the temperature is always between 0 and 1*.
 This is different from many other simulated annealing implementations, where the
 temperature is often a function of the iteration (maybe user-defined) and the
 probability function is always the same. In my implementation, T starts at 1.0 
@@ -74,6 +78,8 @@ For detailed examples of using the code, please see the subdirectories in this
 repository and the comments in the source code.
 
 ### License
-This code is copyright (c) Sean McBane under the terms of the MIT License.
+The code in `generic_simulated_anneal.hpp` is Copyright (c) Sean McBane, 2016
+under the terms of the MIT License (see LICENSE for detailed legal statement). 
+Example code in subdirectories is not copyrighted.
 
 Sean McBane, 3/30/2016 <seanmcb94@gmail.com>
