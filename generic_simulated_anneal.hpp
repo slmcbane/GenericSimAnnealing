@@ -24,7 +24,11 @@
 #ifndef GENERIC_SIM_ANNEALING_HPP
 #define GENERIC_SIM_ANNEALING_HPP
 
+#include <chrono>
 #include <iostream>
+#include <random>
+
+using std::chrono::system_clock;
 
 #ifdef __FAST_MATH__
 #include <cmath>
@@ -182,6 +186,22 @@ template<class solution, class cost_t, class acceptance_t, class schedule_t,
 	// When returning make sure that we didn't lose a better solution somewhere
 	// along the line.
 	return s.cost() < best.cost() ? s : best;
+}
+
+/*
+ * For convenience, this implementation allows the user to ignore specifying
+ * a random generator and initializes a Mersenne Twister engine with the 
+ * current time by default.
+ */
+template<class solution, class cost_t, class acceptance_t, class schedule_t>
+solution genericSimulatedAnneal(const solution& s0,
+								const GenSimAnnealParams& params,
+								const acceptance_t& acceptance_f,
+								const schedule_t& schedule)
+{
+	std::mt19937_64 generator(system_clock::to_time_t(system_clock::now()));
+	return genericSimulatedAnneal<solution, cost_t, acceptance_t, schedule_t,
+		std::mt19937_64>(s0, params, acceptance_f, schedule, generator);
 }
 
 #endif /* GENERIC_SIM_ANNEALING_HPP */
