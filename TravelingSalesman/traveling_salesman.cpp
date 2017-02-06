@@ -129,14 +129,13 @@ int main()
 		return exp((double(c1) - double(c2)) / T / 600.0);
 	};
 
-	std::mt19937 generator(system_clock::to_time_t(system_clock::now()));
-
 	// This is how the routine can be called if a lambda expression is used for
 	// the acceptance function; it's very similar for the case of a functor or a 
-	// normal function declaration.
+	// normal function declaration. Here the routine is called leaving the random
+	// number generator used as the default std::mt19937_64.
 	Tour result =
-		genericSimulatedAnneal<Tour, unsigned long, decltype(a), decltype(s), std::mt19937>
-		(mytour, params, a, s, generator);
+		genericSimulatedAnneal<Tour, unsigned long, decltype(a), decltype(s)>
+		(mytour, params, a, s);
 
 	std::cout << "Tour length: " << result.cost() << std::endl;
 	std::cout << "Computed tour: ";
